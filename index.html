@@ -6,7 +6,7 @@
 <title>Двері та вікна МЗК</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;700;800&family=JetBrains+Mono:wght@500&display=swap">
 <style>
-/* Layout: summary numbers -> status split per під'їзд -> floor-by-floor grid -> conflicts -> comments */
+/* Layout: summary numbers -> status split per під'їзд -> plan cards with floor table -> conflicts -> comments */
 :root{
   --bg:#f3f4f2; --surface:#ffffff; --fg:#1d2321; --muted:#5d6763; --line:#dde1de;
   --ok:#c9d2cd; --ok-ink:#4b5752;
@@ -60,6 +60,8 @@ td.l b{font-size:16px}
 td.l small{color:var(--muted);margin-left:6px}
 td.c{min-width:30px;height:30px;border-radius:5px;text-align:center;font:700 13px var(--mono)}
 .gap td{height:6px;padding:0}
+tr.sel td.l{background:var(--bg);border-radius:5px}
+td.l{padding-left:6px}
 .sect td{padding:10px 0 2px;font-weight:800;font-size:13px}
 .list{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0;padding:0;list-style:none}
 .list li{display:contents}
@@ -88,14 +90,6 @@ button:focus-visible{outline:2px solid var(--fixed);outline-offset:2px}
   <section>
     <h2>Плани місць загального користування</h2>
     <div class="plans" id="plans"></div>
-  </section>
-
-  <section>
-    <h2>Поверх за поверхом</h2>
-    <div class="card">
-      <div class="legend" id="legend" style="margin-bottom:14px"></div>
-      <div class="scroll"><table id="grid"></table></div>
-    </div>
   </section>
 
   <section id="confSec" hidden>
@@ -176,14 +170,24 @@ function planSVG(e, rows, sel){
   });
   return `<svg viewBox="0 0 ${P.w} ${P.h}" role="img" aria-label="План під'їзду ${e}"><image href="${P.src}" x="0" y="0" width="${P.w}" height="${P.h}"/>${g}</svg>`;
 }
+function gridHTML(e, rows, sel){
+  if(!rows.length) return '';
+  let h=`<tr><th class="l">Поверх</th>${LAB[e].map(l=>`<th>${l}</th>`).join('')}</tr>`;
+  rows.forEach(F=>{
+    const extra=[]; if(SHOW_APT&&F.apts.size) extra.push('кв. '+[...F.apts].join(', ')); if(F.n>1) extra.push('×'+F.n+' записи');
+    h+=`<tr${F.f===sel?' class="sel"':''}><td class="l"><b>${F.f}</b>${extra.length?`<small>${esc(extra.join(' · '))}</small>`:''}</td>`+
+      LAB[e].map((_,i)=>{const s=F.state[i]; return s?`<td class="c s-${s}" title="${LAB[e][i]}: ${NAME[s]}">${SYM[s]}</td>`:`<td class="c"></td>`;}).join('')+'</tr>';
+  });
+  return `<div class="scroll" style="margin-top:16px"><table>${h}</table></div>`;
+}
 function renderPlans(list){
   $('plans').innerHTML=[1,2].map(e=>{
     const rows=list.filter(F=>F.e===e);
     if(!rows.some(r=>r.f===planSel[e])) planSel[e]=rows.length?rows[0].f:null;
     const sel=planSel[e];
     const chips=rows.map(r=>`<button class="chip" type="button" data-e="${e}" data-f="${r.f}" aria-pressed="${sel===r.f}">${r.f} пов.</button>`).join('');
-    const hint = rows.length ? `Стан на ${sel} поверсі. Номери збігаються з номерами на плані та у формі.` : 'Даних ще немає.';
-    return `<div class="card plan"><h3>Під'їзд ${e}</h3><div class="chips" role="group" aria-label="Поверх, під'їзд ${e}">${chips}</div>${planSVG(e,rows,sel)}<div class="legend" style="margin-top:12px">${ORDER.map(k=>`<span><i class="sw s-${k}">${SYM[k]}</i>${NAME[k]}</span>`).join('')}</div><p class="hint">${hint} Поверхи без даних у списку відсутні.</p></div>`;
+    const hint = rows.length ? `Стан на ${sel} поверсі. Д — двері, В — вікно, номери збігаються з планом та формою.` : 'Даних ще немає.';
+    return `<div class="card plan"><h3>Під'їзд ${e}</h3><div class="chips" role="group" aria-label="Поверх, під'їзд ${e}">${chips}</div>${planSVG(e,rows,sel)}<div class="legend" style="margin-top:12px">${ORDER.map(k=>`<span><i class="sw s-${k}">${SYM[k]}</i>${NAME[k]}</span>`).join('')}</div><p class="hint">${hint} Поверхи без даних у списку відсутні.</p>${gridHTML(e,rows,sel)}</div>`;
   }).join('');
 }
 document.getElementById('plans').addEventListener('click',ev=>{
@@ -280,23 +284,6 @@ function render(records, updatedLabel){
     ['ok',all.ok,'без пошкоджень (з '+total+' перевірених)']
   ];
   $('tiles').innerHTML=tiles.map(([k,n,t])=>`<div class="tile"><i style="background:${COLV[k]}"></i><b>${n}</b><span>${t}</span></div>`).join('');
-
-  $('legend').innerHTML=`<span>Д — двері, В — вікно, число — номер у формі</span>`+ORDER.map(k=>`<span><i class="sw s-${k}">${SYM[k]}</i>${NAME[k]}</span>`).join('');
-
-  let h='';
-  [1,2].forEach(e=>{
-    const rows=list.filter(F=>F.e===e);
-    if(!rows.length) return;
-    h+=`<tr class="sect"><td class="l" colspan="${LAB[e].length+1}">Під'їзд ${e}</td></tr>`;
-    h+=`<tr><th class="l">Поверх</th>${LAB[e].map(l=>`<th>${l}</th>`).join('')}</tr>`;
-    rows.forEach(F=>{
-      const extra=[]; if(SHOW_APT&&F.apts.size) extra.push('кв. '+[...F.apts].join(', ')); if(F.n>1) extra.push('×'+F.n+' записи');
-      h+=`<tr><td class="l"><b>${F.f}</b>${extra.length?`<small>${esc(extra.join(' · '))}</small>`:''}</td>`+
-        LAB[e].map((_,i)=>{const s=F.state[i]; return s?`<td class="c s-${s}" title="${LAB[e][i]}: ${NAME[s]}">${SYM[s]}</td>`:`<td class="c"></td>`;}).join('')+'</tr>';
-    });
-    h+='<tr class="gap"><td></td></tr>';
-  });
-  $('grid').innerHTML=h;
 
   $('confSec').hidden=!conflicts.length;
   $('conf').innerHTML=conflicts.map(c=>`<li><span class="k">П${c.e} · ${c.f} пов.</span><span class="v">${LAB[c.e][c.i]}: раніше «${NAME[c.from]}», у новішому записі «${NAME[c.to]}»</span></li>`).join('');
