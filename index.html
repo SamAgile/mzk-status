@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Двері та вікна МЗК</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: summary numbers -> status split per під'їзд -> floor-by-floor grid -> conflicts -> comments */
+:root{
+  --bg:#f3f4f2; --surface:#ffffff; --fg:#1d2321; --muted:#5d6763; --line:#dde1de;
+  --ok:#c9d2cd; --ok-ink:#4b5752;
+  --fixed:#2f7d6d; --repair:#e0a21b; --missing:#c8402f; --conf:#7a4bb8;
+  --font:'Onest',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141917; --surface:#1d2420; --fg:#e8ecea; --muted:#9aa6a0; --line:#2e3833;
+  --ok:#34403a; --ok-ink:#a7b3ad;
+  --fixed:#4cb59f; --repair:#e8b13c; --missing:#ec6b59; --conf:#b895ee; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);
+  padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:28px 40px}
+.wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1{font-size:clamp(26px,5vw,38px);line-height:1.1;margin:0;font-weight:800;text-wrap:balance;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:8px 0 0}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0 0 12px;font-weight:700}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 14px 12px;min-width:0}
+.tile b{display:block;font-size:40px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums}
+.tile span{display:block;margin-top:6px;font-size:13px;color:var(--muted)}
+.tile i{display:block;height:5px;border-radius:3px;margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px}
+.split{display:flex;flex-direction:column;gap:18px}
+.split .row{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center}
+.split .name{font-weight:700}
+.split .name small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.bar{display:flex;height:34px;border-radius:6px;overflow:hidden;gap:2px}
+.bar div{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:18px;height:18px;border-radius:4px;display:inline-grid;place-items:center;font:700 12px/1 var(--mono)}
+.s-ok{background:var(--ok);color:var(--ok-ink)}
+.s-fixed{background:var(--fixed);color:#fff}
+.s-repair{background:var(--repair);color:#2b1c00}
+.s-missing{background:var(--missing);color:#fff}
+.s-conflict{background:transparent;color:var(--conf);outline:2px dashed var(--conf);outline-offset:-2px}
+.scroll{overflow-x:auto}
+table{border-collapse:separate;border-spacing:3px;width:100%}
+th{font:500 11px var(--mono);color:var(--muted);padding:0 0 4px;text-align:center}
+th.l,td.l{text-align:left;padding-right:10px;white-space:nowrap}
+td.l b{font-size:16px}
+td.l small{color:var(--muted);margin-left:6px}
+td.c{min-width:30px;height:30px;border-radius:5px;text-align:center;font:700 13px var(--mono)}
+.gap td{height:6px;padding:0}
+.sect td{padding:10px 0 2px;font-weight:800;font-size:13px}
+.list{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0;padding:0;list-style:none}
+.list li{display:contents}
+.list .k{font:500 13px var(--mono);color:var(--muted);white-space:nowrap}
+.list .v{min-width:0;overflow-wrap:anywhere}
+.bottom{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px;color:var(--muted)}
+button{font:inherit;font-size:13px;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--fixed);outline-offset:2px}
+#status.err{color:var(--missing)}
+[hidden]{display:none!important}
+@media(max-width:560px){
+  .split .row{grid-template-columns:1fr;gap:6px}
+  .split .name small{display:inline;margin-left:6px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Двері та вікна в місцях загального користування</h1>
+    <p class="sub" id="sub">ОСББ «Київська Венеція» · завантаження даних…</p>
+  </header>
+
+  <section aria-label="Підсумок"><div class="tiles" id="tiles"></div></section>
+
+  <section>
+    <h2>Стан по під'їздах</h2>
+    <div class="card split" id="split"></div>
+  </section>
+
+  <section>
+    <h2>Поверх за поверхом</h2>
+    <div class="card">
+      <div class="legend" id="legend" style="margin-bottom:14px"></div>
+      <div class="scroll"><table id="grid"></table></div>
+    </div>
+  </section>
+
+  <section id="confSec" hidden>
+    <h2>Суперечлива інформація, потрібна перевірка</h2>
+    <div class="card"><ul class="list" id="conf"></ul></div>
+  </section>
+
+  <section id="notesSec" hidden>
+    <h2>Коментарі мешканців</h2>
+    <div class="card"><ul class="list" id="notes"></ul></div>
+  </section>
+
+  <div class="bottom">
+    <button id="refresh" type="button">Оновити зараз</button>
+    <span id="status" role="status"></span>
+  </div>
+  <p class="bottom" style="margin:0">Сторінка сама перечитує таблицю кожні 5 хвилин. Якщо один поверх подали кілька разів, записи порівнюються за часом: «було цілим або відремонтованим → стало пошкодженим» позначається «?», «було пошкодженим → стало цілим або відремонтованим» вважається відремонтованим.</p>
+</div>
+
+<script>
+/* ---------- налаштування ---------- */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXPWsreHYW_K70_cfgiu9g-0YFi4zQen0fUYuiMj0NNWZsyRVL3Z4Q8K-ME4doev3Ws9_bi2H5mNip/pub?gid=333479781&single=true&output=csv";
+const REFRESH_MS = 5 * 60 * 1000;
+const SHOW_APT = false;    // true: показувати номери квартир біля поверху
+const SHOW_NOTES = true;   // false: не показувати текстові коментарі
+
+/* ---------- структура форми ---------- */
+const LAB = {
+  1: ['Д1','Д2','В3','Д4','Д5','В6','В7','В8','Д9','Д10','Д11','Д12','Д13'],
+  2: ['Д4','Д5','Д6','Д7','Д8','Д9','В10']
+};
+const MAP = {'Не пошкоджено':'ok','Треба ремонт':'repair','Відремонтували':'fixed','Відсутнє':'missing'};
+const NAME = {ok:'Без пошкоджень',fixed:'Відремонтовано',repair:'Потрібен ремонт',missing:'Відсутнє',conflict:'Суперечлива інформація'};
+const SYM  = {ok:'',fixed:'✓',repair:'!',missing:'×',conflict:'?'};
+const ORDER = ['missing','repair','conflict','fixed','ok'];
+const COLV = {ok:'var(--ok)',fixed:'var(--fixed)',repair:'var(--repair)',missing:'var(--missing)',conflict:'var(--conf)'};
+const BAD = s => s === 'repair' || s === 'missing';
+const GOOD = s => s === 'ok' || s === 'fixed';
+
+/* ---------- знімок даних на 5 листопада 12:47 (запасний варіант) ---------- */
+const SNAPSHOT = [{"t": 1793832429000, "e": 2, "a": "230", "f": 16, "s": ["repair", "repair", "repair", "ok", "ok", "ok", "ok"], "n": ""}, {"t": 1793832449000, "e": 2, "a": "228", "f": 15, "s": ["repair", "repair", "repair", "repair", "ok", "ok", "ok"], "n": "8-10 не точно"}, {"t": 1793832555000, "e": 2, "a": "256", "f": 19, "s": ["fixed", "fixed", "fixed", "ok", "ok", "ok", "ok"], "n": "Двері 5 сусіди викинули, тому ми тимчасово закрили імпровізованими дверима з OSB"}, {"t": 1793832748000, "e": 1, "a": "23", "f": 6, "s": ["ok", "missing", "ok", "repair", "fixed", "missing", "repair", "repair", "ok", "ok", "fixed", "ok", "ok"], "n": ""}, {"t": 1793835075000, "e": 2, "a": "147", "f": 5, "s": ["fixed", "fixed", "fixed", "ok", "ok", "ok", "ok"], "n": "Відремонтували (тобто забили фанерами все що було пошкоджене на поверсі)"}, {"t": 1793837166000, "e": 2, "a": "233", "f": 16, "s": ["repair", "missing", "repair", "ok", "ok", "ok", "ok"], "n": "Двері 6 в поганому стані, можливо ремонт складний"}, {"t": 1793838710000, "e": 2, "a": "309", "f": 26, "s": ["fixed", "fixed", "missing", "ok", "ok", "ok", "ok"], "n": ""}, {"t": 1793858416000, "e": 1, "a": "63", "f": 13, "s": ["ok", "repair", "repair", "repair", "repair", "ok", "ok", "repair", "ok", "ok", "repair", "ok", "ok"], "n": ""}, {"t": 1793860464000, "e": 2, "a": "256", "f": 19, "s": ["fixed", "missing", "fixed", "ok", "ok", "ok", "ok"], "n": "5 з фанери, бо хтось викинув поламані."}, {"t": 1793861582000, "e": 2, "a": "173", "f": 9, "s": ["missing", "missing", "missing", "repair", "ok", "ok", "ok"], "n": ""}, {"t": 1793862899000, "e": 1, "a": "28", "f": 7, "s": ["repair", "repair", "ok", "repair", "repair", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"], "n": ""}, {"t": 1793864552000, "e": 2, "a": "330", "f": 28, "s": ["fixed", "fixed", "fixed", "fixed", "ok", "ok", "ok"], "n": "Двері 4,5,6 - відновлено, але закриваються з силою, треба на них піднажати, щоб плотно ставали на місце. \nДвері 8,9 - закриваються, якщо застосувати зусилля (бажано оглянути майстру, вони залізні)."}, {"t": 1793867280000, "e": 2, "a": "304", "f": 25, "s": ["repair", "repair", "repair", "ok", "ok", "ok", "ok"], "n": ""}, {"t": 1793867998000, "e": 1, "a": "92", "f": 18, "s": ["ok", "fixed", "fixed", "fixed", "fixed", "fixed", "fixed", "fixed", "ok", "fixed", "ok", "ok", "ok"], "n": "Все що відремонтоване - потребує заміни.\nДата: 05.11.2026"}, {"t": 1793868875000, "e": 2, "a": "336", "f": 29, "s": ["ok", "fixed", "fixed", "ok", "ok", "ok", "ok"], "n": "Відремонтували своїми силами"}, {"t": 1793869511000, "e": 2, "a": "138", "f": 4, "s": ["fixed", "fixed", "ok", "ok", "ok", "ok", "ok"], "n": ""}, {"t": 1793869800000, "e": 2, "a": "349", "f": 31, "s": ["fixed", "fixed", "fixed", "ok", "ok", "ok", "ok"], "n": ""}, {"t": 1793876281000, "e": 2, "a": "189", "f": 11, "s": ["missing", "missing", "missing", "fixed", "ok", "ok", "ok"], "n": ""}, {"t": 1793879497000, "e": 2, "a": "150", "f": 6, "s": ["missing", "missing", "missing", "ok", "ok", "ok", "ok"], "n": "4,5,6 все розломане, ремонту не підлягає (моя особиста думка), все склала на купку після прибирання"}, {"t": 1793882876000, "e": 2, "a": "179", "f": 9, "s": ["missing", "missing", "missing", "repair", "ok", "ok", "ok"], "n": ""}];
+
+/* ---------- CSV ---------- */
+function parseCSV(text){
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; }
+      else f+=c;
+    } else if(c==='"') q=true;
+    else if(c===','){ row.push(f); f=''; }
+    else if(c==='\n'||c==='\r'){
+      if(c==='\r'&&text[i+1]==='\n') i++;
+      row.push(f); f=''; rows.push(row); row=[];
+    } else f+=c;
+  }
+  if(f!==''||row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+function tsValue(s,i){
+  const m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec((s||'').trim());
+  return m ? Date.UTC(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+(m[6]||0)) : i; // dd/mm/yyyy
+}
+function recordsFromCSV(text){
+  const rows=parseCSV(text).slice(1);
+  const out=[];
+  rows.forEach((r,i)=>{
+    if(!r[0]||!r[1]) return;
+    const e = /2/.test(r[1]) ? 2 : (/1/.test(r[1]) ? 1 : 0);
+    if(!e) return;
+    let f, vals, note;
+    if(e===1){ f=r[3]; vals=r.slice(4,17); note=r[17]; }
+    else {
+      let st = (r[18]||'').trim()!=='' ? 18 : 19;   // страховка від зсуву стовпців
+      f=r[st]; vals=r.slice(st+1,st+8); note=r[st+8];
+    }
+    const fl=parseInt(f,10);
+    if(!fl) return;
+    out.push({t:tsValue(r[0],i), e, a:(r[2]||'').trim(), f:fl,
+      s: vals.map(v=>MAP[(v||'').trim()]||''), n:(note||'').trim()});
+  });
+  return out;
+}
+
+/* ---------- об'єднання повторних записів ---------- */
+function merge(records){
+  const recs=records.slice().sort((x,y)=>x.t-y.t);
+  const floors=new Map(), conflicts=[];
+  recs.forEach(r=>{
+    const key=r.e+':'+r.f;
+    let F=floors.get(key);
+    if(!F){ F={e:r.e,f:r.f,apts:new Set(),n:0,state:[],last:[],notes:[]}; floors.set(key,F); }
+    F.n++; if(r.a) F.apts.add(r.a);
+    if(r.n) F.notes.push(r.n);
+    r.s.forEach((cur,i)=>{
+      if(!cur) return;
+      const prev=F.last[i];
+      if(prev===undefined){ F.state[i]=cur; }
+      else if(GOOD(prev)&&BAD(cur)){ F.state[i]='conflict'; conflicts.push({e:r.e,f:r.f,i,from:prev,to:cur}); }
+      else if(BAD(prev)&&GOOD(cur)){ F.state[i]='fixed'; }
+      else if(prev===cur){ /* без змін: залишається поточний стан, у тому числі «?» */ }
+      else { F.state[i]=cur; }
+      F.last[i]=cur;
+    });
+  });
+  const list=[...floors.values()].sort((a,b)=>a.e-b.e||a.f-b.f);
+  return {list,conflicts};
+}
+
+/* ---------- відображення ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const count=(list)=>{const c={ok:0,fixed:0,repair:0,missing:0,conflict:0};list.forEach(F=>F.state.forEach(s=>{if(c[s]!==undefined)c[s]++;}));return c;};
+
+function render(records, updatedLabel){
+  const {list,conflicts}=merge(records);
+  const all=count(list), total=Object.values(all).reduce((a,b)=>a+b,0);
+  const nE=e=>list.filter(F=>F.e===e).length;
+  $('sub').textContent = `ОСББ «Київська Венеція» · інвентаризація · дані з ${list.length} поверхів (під'їзд 1: ${nE(1)}, під'їзд 2: ${nE(2)}) · ${updatedLabel}`;
+
+  const tiles=[
+    ['missing',all.missing,'відсутні, потрібна заміна'],
+    ['repair',all.repair,'потребують ремонту'],
+    ['conflict',all.conflict,'суперечлива інформація'],
+    ['fixed',all.fixed,'вже відремонтовано'],
+    ['ok',all.ok,'без пошкоджень (з '+total+' перевірених)']
+  ];
+  $('tiles').innerHTML=tiles.map(([k,n,t])=>`<div class="tile"><i style="background:${COLV[k]}"></i><b>${n}</b><span>${t}</span></div>`).join('');
+
+  const txt=k=>k==='repair'?'#2b1c00':(k==='ok'?'var(--ok-ink)':(k==='conflict'?'var(--bg)':'#fff'));
+  $('split').innerHTML=[1,2].map(e=>{
+    const rows=list.filter(F=>F.e===e), c=count(rows), n=Object.values(c).reduce((a,b)=>a+b,0);
+    if(!rows.length) return `<div class="row"><div class="name">Під'їзд ${e}<small>немає даних</small></div><div></div></div>`;
+    return `<div class="row"><div class="name">Під'їзд ${e}<small>${rows.length} пов., ${n} елементів</small></div>
+      <div class="bar" role="img" aria-label="Під'їзд ${e}">${ORDER.map(k=>c[k]?`<div style="flex:${c[k]};background:${COLV[k]};color:${txt(k)}">${c[k]}</div>`:'').join('')}</div></div>`;
+  }).join('') + `<div class="legend">${ORDER.map(k=>`<span><i class="sw s-${k}">${SYM[k]}</i>${NAME[k]}</span>`).join('')}</div>`;
+
+  $('legend').innerHTML=`<span>Д — двері, В — вікно, число — номер у формі</span>`+ORDER.map(k=>`<span><i class="sw s-${k}">${SYM[k]}</i>${NAME[k]}</span>`).join('');
+
+  let h='';
+  [1,2].forEach(e=>{
+    const rows=list.filter(F=>F.e===e);
+    if(!rows.length) return;
+    h+=`<tr class="sect"><td class="l" colspan="${LAB[e].length+1}">Під'їзд ${e}</td></tr>`;
+    h+=`<tr><th class="l">Поверх</th>${LAB[e].map(l=>`<th>${l}</th>`).join('')}</tr>`;
+    rows.forEach(F=>{
+      const extra=[]; if(SHOW_APT&&F.apts.size) extra.push('кв. '+[...F.apts].join(', ')); if(F.n>1) extra.push('×'+F.n+' записи');
+      h+=`<tr><td class="l"><b>${F.f}</b>${extra.length?`<small>${esc(extra.join(' · '))}</small>`:''}</td>`+
+        LAB[e].map((_,i)=>{const s=F.state[i]; return s?`<td class="c s-${s}" title="${LAB[e][i]}: ${NAME[s]}">${SYM[s]}</td>`:`<td class="c"></td>`;}).join('')+'</tr>';
+    });
+    h+='<tr class="gap"><td></td></tr>';
+  });
+  $('grid').innerHTML=h;
+
+  $('confSec').hidden=!conflicts.length;
+  $('conf').innerHTML=conflicts.map(c=>`<li><span class="k">П${c.e} · ${c.f} пов.</span><span class="v">${LAB[c.e][c.i]}: раніше «${NAME[c.from]}», у новішому записі «${NAME[c.to]}»</span></li>`).join('');
+
+  const notes=[]; if(SHOW_NOTES) list.forEach(F=>F.notes.forEach(n=>notes.push([`П${F.e} · ${F.f} пов.`,n])));
+  $('notesSec').hidden=!notes.length;
+  $('notes').innerHTML=notes.map(([k,v])=>`<li><span class="k">${k}</span><span class="v">${esc(v)}</span></li>`).join('');
+}
+
+/* ---------- завантаження та автооновлення ---------- */
+const hhmm=d=>d.toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'});
+let current=null;
+function show(records,label){ current=records; render(records,label); }
+async function load(){
+  const st=$('status'); st.className='';
+  try{
+    const res=await fetch(CSV_URL+(CSV_URL.includes('?')?'&':'?')+'_='+Date.now(),{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const recs=recordsFromCSV(await res.text());
+    if(!recs.length) throw new Error('таблиця порожня або змінилася структура');
+    show(recs,'оновлено '+hhmm(new Date()));
+    st.textContent='Оновлено '+hhmm(new Date());
+    try{ localStorage.setItem('mzk-cache',JSON.stringify({at:Date.now(),recs})); }catch(e){}
+  }catch(err){
+    st.className='err';
+    st.textContent='Не вдалося оновити ('+err.message+'). Показано останні відомі дані.';
+    if(!current){
+      let cached=null; try{ cached=JSON.parse(localStorage.getItem('mzk-cache')||'null'); }catch(e){}
+      if(cached&&cached.recs) show(cached.recs,'дані від '+hhmm(new Date(cached.at)));
+      else show(SNAPSHOT,'знімок на 5.11.2026, 12:47');
+    }
+  }
+}
+$('refresh').addEventListener('click',load);
+show(SNAPSHOT,'завантаження…');
+load();
+setInterval(load,REFRESH_MS);
+</script>
+</body>
+</html>
