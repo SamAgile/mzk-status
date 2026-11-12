@@ -69,6 +69,9 @@ td.l{padding-left:6px}
 .list .v{min-width:0;overflow-wrap:anywhere}
 .bottom{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12px;color:var(--muted)}
 button{font:inherit;font-size:13px;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+a.cta{display:inline-block;margin:0 0 14px;padding:10px 16px;border-radius:8px;background:var(--fixed);color:#fff;font-weight:700;font-size:14px;text-decoration:none}
+a.cta:hover{filter:brightness(1.1)}
+a.cta:focus-visible,button:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 button:focus-visible{outline:2px solid var(--fixed);outline-offset:2px}
 #status.err{color:var(--missing)}
 [hidden]{display:none!important}
@@ -113,6 +116,7 @@ button:focus-visible{outline:2px solid var(--fixed);outline-offset:2px}
 /* ---------- налаштування ---------- */
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSXPWsreHYW_K70_cfgiu9g-0YFi4zQen0fUYuiMj0NNWZsyRVL3Z4Q8K-ME4doev3Ws9_bi2H5mNip/pub?gid=333479781&single=true&output=csv";
 const REFRESH_MS = 5 * 60 * 1000;
+const FORM_URL = "https://forms.gle/QiVEKnjCHjEDHDBr5";
 const SHOW_APT = false;    // true: показувати номери квартир біля поверху
 const SHOW_NOTES = true;   // false: не показувати текстові коментарі
 
@@ -187,7 +191,7 @@ function renderPlans(list){
     const sel=planSel[e];
     const chips=rows.map(r=>`<button class="chip" type="button" data-e="${e}" data-f="${r.f}" aria-pressed="${sel===r.f}">${r.f} пов.</button>`).join('');
     const hint = rows.length ? `Стан на ${sel} поверсі. Д — двері, В — вікно, номери збігаються з планом та формою.` : 'Даних ще немає.';
-    return `<div class="card plan"><h3>Під'їзд ${e}</h3><div class="chips" role="group" aria-label="Поверх, під'їзд ${e}">${chips}</div>${planSVG(e,rows,sel)}<div class="legend" style="margin-top:12px">${ORDER.map(k=>`<span><i class="sw s-${k}">${SYM[k]}</i>${NAME[k]}</span>`).join('')}</div><p class="hint">${hint} Поверхи без даних у списку відсутні.</p>${gridHTML(e,rows,sel)}</div>`;
+    return `<div class="card plan"><h3>Під'їзд ${e}</h3><a class="cta" href="${FORM_URL}" target="_blank" rel="noopener">Подати актуальну інформацію по своєму поверху</a><div class="chips" role="group" aria-label="Поверх, під'їзд ${e}">${chips}</div>${planSVG(e,rows,sel)}<div class="legend" style="margin-top:12px">${ORDER.map(k=>`<span><i class="sw s-${k}">${SYM[k]}</i>${NAME[k]}</span>`).join('')}</div><p class="hint">${hint} Поверхи без даних у списку відсутні.</p>${gridHTML(e,rows,sel)}</div>`;
   }).join('');
 }
 document.getElementById('plans').addEventListener('click',ev=>{
