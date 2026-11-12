@@ -109,7 +109,7 @@ button:focus-visible{outline:2px solid var(--fixed);outline-offset:2px}
     <button id="refresh" type="button">Оновити зараз</button>
     <span id="status" role="status"></span>
   </div>
-  <p class="bottom" style="margin:0">Сторінка сама перечитує таблицю кожні 5 хвилин. Якщо один поверх подали кілька разів, записи порівнюються за часом: «було цілим або відремонтованим → стало пошкодженим» позначається «?», «було пошкодженим → стало цілим або відремонтованим» вважається відремонтованим.</p>
+  <p class="bottom" style="margin:0">Сторінка сама перечитує таблицю кожні 5 хвилин. Якщо один поверх подали кілька разів, записи порівнюються за часом: «було цілим або з тимчасовим ремонтом → стало пошкодженим» позначається «?», «було пошкодженим → стало цілим або з тимчасовим ремонтом» вважається «тимчасовий ремонт OSB».</p>
 </div>
 
 <script>
@@ -136,7 +136,7 @@ function mapStatus(v){
   if(n.startsWith('відсутн')) return 'missing';
   UNKNOWN.add(v.trim()); return '';
 }
-const NAME = {ok:'Без пошкоджень',fixed:'Відремонтовано',repair:'Потрібен ремонт',missing:'Відсутнє',conflict:'Суперечлива інформація'};
+const NAME = {ok:'Без пошкоджень',fixed:'Тимчасовий ремонт OSB',repair:'Потрібен ремонт',missing:'Відсутнє',conflict:'Суперечлива інформація'};
 const SYM  = {ok:'',fixed:'✓',repair:'!',missing:'×',conflict:'?'};
 const ORDER = ['missing','repair','conflict','fixed','ok'];
 const COLV = {ok:'var(--ok)',fixed:'var(--fixed)',repair:'var(--repair)',missing:'var(--missing)',conflict:'var(--conf)'};
@@ -294,7 +294,7 @@ function render(records, updatedLabel){
     ['missing',all.missing,'відсутні, потрібна заміна'],
     ['repair',all.repair,'потребують ремонту'],
     ['conflict',all.conflict,'суперечлива інформація'],
-    ['fixed',all.fixed,'вже відремонтовано'],
+    ['fixed',all.fixed,'тимчасовий ремонт OSB'],
     ['ok',all.ok,'без пошкоджень (з '+total+' перевірених)']
   ];
   $('tiles').innerHTML=tiles.map(([k,n,t])=>`<div class="tile"><i style="background:${COLV[k]}"></i><b>${n}</b><span>${t}</span></div>`).join('');
