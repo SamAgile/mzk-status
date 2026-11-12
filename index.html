@@ -125,7 +125,17 @@ const LAB = {
   1: ['Д1','Д2','В3','Д4','Д5','В6','В7','В8','Д9','Д10','Д11','Д12','Д13'],
   2: ['Д4','Д5','Д6','Д7','Д8','Д9','В10']
 };
-const MAP = {'Не пошкоджено':'ok','Треба ремонт':'repair','Відремонтували':'fixed','Відсутнє':'missing'};
+// Розпізнаємо за початком тексту, тож старі («Відремонтували») і нові («Відремонт. OSB») відповіді рахуються однаково
+const UNKNOWN = new Set();
+function mapStatus(v){
+  const n=(v||'').trim().toLowerCase();
+  if(!n) return '';
+  if(n.startsWith('не пошкоджено')) return 'ok';
+  if(n.startsWith('треба ремонт')) return 'repair';
+  if(n.startsWith('відремонт')) return 'fixed';
+  if(n.startsWith('відсутн')) return 'missing';
+  UNKNOWN.add(v.trim()); return '';
+}
 const NAME = {ok:'Без пошкоджень',fixed:'Відремонтовано',repair:'Потрібен ремонт',missing:'Відсутнє',conflict:'Суперечлива інформація'};
 const SYM  = {ok:'',fixed:'✓',repair:'!',missing:'×',conflict:'?'};
 const ORDER = ['missing','repair','conflict','fixed','ok'];
@@ -224,7 +234,7 @@ function tsValue(s,i){
 }
 function recordsFromCSV(text){
   const rows=parseCSV(text).slice(1);
-  const out=[];
+  const out=[]; UNKNOWN.clear();
   rows.forEach((r,i)=>{
     if(!r[0]||!r[1]) return;
     const e = /2/.test(r[1]) ? 2 : (/1/.test(r[1]) ? 1 : 0);
@@ -238,7 +248,7 @@ function recordsFromCSV(text){
     const fl=parseInt(f,10);
     if(!fl) return;
     out.push({t:tsValue(r[0],i), e, a:(r[2]||'').trim(), f:fl,
-      s: vals.map(v=>MAP[(v||'').trim()]||''), n:(note||'').trim()});
+      s: vals.map(mapStatus), n:(note||'').trim()});
   });
   return out;
 }
@@ -309,7 +319,8 @@ async function load(){
     const recs=recordsFromCSV(await res.text());
     if(!recs.length) throw new Error('таблиця порожня або змінилася структура');
     show(recs,'оновлено '+hhmm(new Date()));
-    st.textContent='Оновлено '+hhmm(new Date());
+    st.textContent='Оновлено '+hhmm(new Date())+(UNKNOWN.size?'. Невідомі статуси у таблиці (не враховано): '+[...UNKNOWN].join(', '):'');
+    if(UNKNOWN.size) st.className='err';
     try{ localStorage.setItem('mzk-cache',JSON.stringify({at:Date.now(),recs})); }catch(e){}
   }catch(err){
     st.className='err';
